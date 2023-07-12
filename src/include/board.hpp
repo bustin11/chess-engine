@@ -6,13 +6,20 @@
  */
 #pragma once
 
+#include <stdio.h>
 #include <array>
 #include <vector>
+#include <list>
+#include <set>
 
 #include "piece.hpp"
 
+#define linear_index(x,y) y * NUM_ROW + x
+#define xy_index(x,y,square) square_t x = square % NUM_ROW; \
+                             square_t y = square / NUM_ROW;
+
 using chess::piece_t, chess::color_t;
-using std::string, std::array, std::vector, std::pair;
+using std::string, std::array, std::vector, std::pair, std::set;
 
 namespace chess {
 
@@ -21,17 +28,30 @@ const string FEN_START =
 
 template <typename T> class Board {
 
-  struct Event {
-    const int _index; // index of occurance (1 indexed)
-    const int _square; // en_passant or capture square or castling (64, 65, 66, 67)
-    const T _captured_piece; // -1 if no capture
-    Event(int index, int square, T capture_piece) : 
-      _index(index), _square(square), _captured_piece(capture_piece) {}
-    Event(int index, int square) :
-       _index(index), _square(square), _captured_piece(EMPTY) {}
-    Event(int index) :
-       _index(index), _square(-1), _captured_piece(EMPTY) {}
-  };
+struct Event {
+  // const Move _move;
+  const __uint8_t castling_rights_; // after move
+  const piece_t captured_piece_; // after move
+  const Move move_;
+  const square_t en_passant_square_; // after move
+  // Event(const Move& move, __uint8_t castling_rights, piece_t captured_piece, square_t en_passant_square) :
+  //   from_(move.from_), to_(move.to_), castling_rights_(castling_rights), captured_piece_(captured_piece), 
+  //     en_passant_square_(en_passant_square) {}
+  Event(const Move& move, __uint8_t castling_rights, piece_t captured_piece, square_t en_passant_square) :
+    move_(move), castling_rights_(castling_rights), captured_piece_(captured_piece), 
+      en_passant_square_(en_passant_square) {}
+  // Event(square_t from, square_t to, __uint8_t castling_rights, piece_t captured_piece) :
+  //   _from(from), _to(to), _castling_rights(castling_rights), _captured_piece(captured_piece) {}
+};
+
+struct MetaData {
+  set<square_t> piece_location_ = {}; // 0/1 := black/white
+
+  array<T, NUM_SQUARES> knp_attacking_counts_ = {}; // double check/check
+  array<T, NUM_SQUARES> qrb_attacking_counts_ = {}; // blocking
+  array<T, NUM_SQUARES> xray_counts_ = {}; // pins
+  // capturing is done with the board itself
+};
 
 public:
   Board(){};
@@ -40,6 +60,7 @@ public:
 
   void load_from_fen(const string &fen) {
 
+    LOG_TRACE("loading fen: %s", fen.c_str());
     // place pieces on board
     int index = 0;
     for (char c : fen) {
@@ -51,18 +72,19 @@ public:
         int numEmptySquares = c - '0';
         index += numEmptySquares;
       } else {
-        _board[index] = char_piece_map.at(c);
+        board_[index] = char_piece_map.at(c);
+          printf("%d ", board_[index]);
         index++;
       }
     }
 
     // fen starts upper left to bottom right
     // my board starts from bottom left to upper right
-    for (int square = 0; square < NUM_SQUARES / 2; square++) {
-      int row = NUM_ROW - 1 - (square / NUM_ROW);
-      int col = square % NUM_ROW;
-      int target_square = row * NUM_ROW + col;
-      swap(_board[square], _board[target_square]);
+    for (square_t square = 0; square < NUM_SQUARES / 2; square++) {
+      square_t row = NUM_ROW - 1 - (square / NUM_ROW);
+      square_t col = square % NUM_ROW;
+      square_t target_square = row * NUM_ROW + col;
+      swap(board_[square], board_[target_square]);
     }
 
     // Parse additional information
@@ -70,37 +92,39 @@ public:
     if (pos != string::npos && pos + 1 < fen.size()) {
       string additionalInfo = fen.substr(pos + 1);
       pos = additionalInfo.find(' ');
+      LOG_DEBUG("%s",additionalInfo.c_str());
 
       if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-        _color_to_move = additionalInfo[0] == 'w' ? WHITE : BLACK;
+        color_to_move_ = additionalInfo[0] == 'w' ? WHITE : BLACK;
         additionalInfo = additionalInfo.substr(pos + 1);
-
+LOG_DEBUG("%s",additionalInfo.c_str());
         pos = additionalInfo.find(' ');
         if (pos != string::npos && pos + 1 < additionalInfo.size()) {
           string castling = additionalInfo.substr(0, pos);
           string KQkq = "KQkq";
           for (int i = 3; i >= 0; i--) {
             if (castling.find(KQkq[i]) != string::npos) {
-              _castling_rights |= (1 << i);
+              castling_rights_ |= (1 << i);
             }
           }
+          LOG_DEBUG("castling rights are %d", castling_rights_);
           additionalInfo = additionalInfo.substr(pos + 1);
-
+LOG_DEBUG("%s",additionalInfo.c_str());
           pos = additionalInfo.find(' ');
           if (pos != string::npos && pos + 1 < additionalInfo.size()) {
             if (additionalInfo.substr(0, pos) != "-")
-              _en_passant_square = move_index_map.at(additionalInfo.substr(0, pos));
+              en_passant_square_ = move_index_map.at(additionalInfo.substr(0, pos));
 
             additionalInfo = additionalInfo.substr(pos + 1);
-
+LOG_DEBUG("%s",additionalInfo.c_str());
             pos = additionalInfo.find(' ');
             if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-              _halfMoves = stoi(additionalInfo.substr(0, pos));
+              half_moves_ = stoi(additionalInfo.substr(0, pos));
               additionalInfo = additionalInfo.substr(pos + 1);
-
+LOG_DEBUG("%s",additionalInfo.c_str());
               pos = additionalInfo.find(' ');
               if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-                _fullMoves = stoi(additionalInfo.substr(0, pos));
+                full_moves_ = stoi(additionalInfo.substr(0, pos));
               }
             }
           }
@@ -109,17 +133,28 @@ public:
     }
   }
 
+  inline bool can_castle_king_side(color_t color) const {
+    if (color == WHITE) {
+      return (castling_rights_ & (1 << 3)) && board_[5] == EMPTY && board_[6] == EMPTY;
+    }
+    return (castling_rights_ & (1 << 1)) && board_[61] == EMPTY && board_[62] == EMPTY;
+  }
 
+  inline bool can_castle_queen_side(color_t color) const {
+    if (color == WHITE) {
+      return (castling_rights_ & (1 << 2)) && board_[3] == EMPTY && board_[2] == EMPTY && board_[1] == EMPTY;
+    }
+    return (castling_rights_ & (1 << 0)) && board_[59] == EMPTY && board_[58] == EMPTY && board_[57] == EMPTY;
+  }
 
-  string _fen;
-  array<T, NUM_SQUARES> _board; // The chessboard
-  color_t _color_to_move;  // Whose turn it is ('w' for white, 'b' for black)
-  __uint8_t _castling_rights;  // Castling rights (e.g., "KQkq"), 1101, ie, means KQq
-  int _en_passant_square; // En passant target square (e.g., "e3")
-  int _halfMoves;          // Half-moves since last pawn move or capture
-  int _fullMoves;          // Full moves counter
-  vector<Move> _move_history;
-  vector<Event> _event_history;
+  array<T, NUM_SQUARES> board_ = {}; // The chessboard
+  color_t color_to_move_ = WHITE;  // Whose turn it is ('w' for white, 'b' for black)
+  __uint8_t castling_rights_ = 15;  // Castling rights (e.g., "KQkq"), 1101, ie, means KQq
+  square_t en_passant_square_ = EMPTY; // En passant target square (e.g., "e3")
+  int half_moves_{};          // Half-moves since last pawn move or capture
+  int full_moves_{};          // Full moves counter
+  vector<Event> move_history_ = {};
+  array<MetaData, 2> meta_data_;
 
 };
 

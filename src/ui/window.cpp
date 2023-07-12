@@ -5,7 +5,6 @@
 #include <GL/glut.h>
 #include <SOIL/SOIL.h> // Include SOIL library for loading image textures
 
-#define linear_index(x,y) y * NUM_ROW + x
 #include "window.hpp"
 
 // TODO: add castling, en passant, and promotion to queen
@@ -74,21 +73,18 @@ void drawChessPiece(int x, int y, GLuint texture) {
 
 color_t promotionColor;
 bool selectingPromotionPiece = false;
-int move_from, move_to;
-
+int move_from=-1, move_to=-1;
 bool isPieceSelected = false;
 int selectedPieceX, selectedPieceY;
 void handleMouseClick(int button, int state, int x, int y) {
 
   // if game is in promotion: 
-
+  auto& board = game->get_board().board_;
+  auto color_to_move = game->get_board().color_to_move_;
+  int boardX = x / 100;
+  int boardY = 7 - (y / 100); // Flip the y-coordinate to match the board layout
   if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
 
-    auto& board = game->get_board()._board;
-    auto color_to_move = game->get_board()._color_to_move;
-    int boardX = x / 100;
-    int boardY = 7 - (y / 100); // Flip the y-coordinate to match the board layout
-    LOG_TRACE("%d, %d", boardX, boardY);
     if (!selectingPromotionPiece) {
       // Convert mouse coordinates to board coordinates
       if (!isPieceSelected) {
@@ -98,8 +94,8 @@ void handleMouseClick(int button, int state, int x, int y) {
           selectedPieceY = boardY;
           isPieceSelected = true;
           game->set_piece_selected(linear_index(boardX, boardY), board[linear_index(boardX, boardY)]);
-          for (auto& moves : game->get_moves()) {
-            LOG_TRACE("%s", moves.to_str().c_str());
+          for (auto& move : game->get_moves()) {
+            print_move(move);
           }
           LOG_TRACE("selected");
         }
@@ -113,7 +109,7 @@ void handleMouseClick(int button, int state, int x, int y) {
         } catch (const std::logic_error &exc) { // pawn promotion
           LOG_TRACE("Pawn promotion, please select valid piece to promote to");
           selectingPromotionPiece = true;
-          game->undo_move();
+          // game->undo_move();
           promotionColor = color_to_move;
         }
         selectedPieceX = boardX;
@@ -147,9 +143,11 @@ void handleMouseClick(int button, int state, int x, int y) {
             }
             break;
           case 5: // TODO: handle all cases
+
             if (promotionColor == chess::BLACK) {
               game->make_move(move_from, move_to, chess::BLACK | chess::QUEEN);
             } else {
+              LOG_DEBUG("I'm wroking here");
               game->make_move(move_from, move_to, chess::WHITE | chess::QUEEN);
             }
             break;
@@ -168,9 +166,19 @@ void handleKeyboardPress(unsigned char key, int x, int y) {
   switch (key) {
     case 'u':
       game->undo_move();
+      isPieceSelected = false;
+      selectingPromotionPiece = false;
       break;
   }
   glutPostRedisplay();
+}
+
+void handleMouseMotion(int x, int y) {
+  // if (isPieceSelected) {
+  //   auto& board = game->get_board()._board;
+  //   auto color_to_move = game->get_board()._color_to_move;
+    
+  // }
 }
 
 void drawCheckeredBoard() {
@@ -209,18 +217,20 @@ void drawCheckeredBoard() {
     drawSquare(selectedPieceX * 100, selectedPieceY * 100, 0.952f, 0.666f, 0.376f, .8);
     auto& moves = game->get_moves();
     for (auto& move : moves) {
-      drawSquare(move._to % NUM_ROW * 100, move._to / NUM_ROW * 100, 1.0f, 0.607f, 0.607f, .8f);
-      LOG_TRACE("%s", move.to_str().c_str());
+      drawSquare(move.to_ % NUM_ROW * 100, move.to_ / NUM_ROW * 100, 1.0f, 0.607f, 0.607f, .8f);
+      print_move(move);
     }
   }
 
   // board history
   auto& board = game->get_board();
-  if (board._fullMoves > 1) {
-    auto& last_move = board._move_history.back();
-    drawSquare(last_move._from % NUM_ROW * 100, last_move._from / NUM_ROW * 100, 0.549f, 0.753f, 0.870f, .8);
-    drawSquare(last_move._to % NUM_ROW * 100, last_move._to / NUM_ROW * 100, 0.549f, 0.753f, 0.870f, .8);
-    LOG_DEBUG("last move: %s", last_move.to_str().c_str());
+  if (board.full_moves_ > 1) {
+    const auto& last_move = board.move_history_.back().move_;
+    auto from = last_move.from_;
+    auto to = last_move.to_;
+    drawSquare(from % NUM_ROW * 100, from / NUM_ROW * 100, 0.549f, 0.753f, 0.870f, .8);
+    drawSquare(to % NUM_ROW * 100, to / NUM_ROW * 100, 0.549f, 0.753f, 0.870f, .8);
+    print_move(from, to);
   }
 
 }
@@ -229,7 +239,7 @@ void display() {
   glClear(GL_COLOR_BUFFER_BIT);
   drawCheckeredBoard();
 
-  auto& board = game->get_board()._board;
+  auto& board = game->get_board().board_;
   for (int square = 0; square < chess::NUM_SQUARES; square++) {
     if (board[square] == chess::EMPTY) continue;
     int x = square % 8 * 100; 
@@ -265,6 +275,7 @@ void myInit() {
   gluOrtho2D(0, screenWidth, 0, screenHeight);
 
   game = new StandardGame();
+  LOG_DEBUG("%zu", sizeof(StandardGame));
   game->set_board_fen(chess::FEN_START);
 
 
@@ -304,16 +315,20 @@ int window_run(int argc, char** argv) {
     glutInitDisplayMode(GLUT_RGB);
     glutInitWindowSize(screenWidth, screenHeight);
     glutInitWindowPosition((glutGet(GLUT_SCREEN_WIDTH) - screenWidth) / 2, (glutGet(GLUT_SCREEN_HEIGHT) - screenHeight) / 2);
-    glutCreateWindow("Checkered Board with Chess Pieces");
+    int winID = glutCreateWindow("Checkered Board with Chess Pieces");
 
     glutDisplayFunc(display);
     myInit();
 
     glutMouseFunc(handleMouseClick);
+    glutMotionFunc(handleMouseMotion);
     glutKeyboardFunc(handleKeyboardPress);
 
     glutMainLoop();
+
+    glutDestroyWindow(winID);
     delete game;
+
     return 0;
 }
 

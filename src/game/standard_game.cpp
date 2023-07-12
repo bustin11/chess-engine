@@ -15,120 +15,140 @@ StandardGame::~StandardGame() {
   // TODO: cleanup board
 }
 
-void StandardGame::generate_sliding_moves(int start_square, piece_t piece) {
+void StandardGame::generate_sliding_moves(square_t start_square, piece_t piece) {
 
-  color_t friendly_color = get_color(piece);
-  color_t opponent_color = opposite_color(friendly_color);
+  auto& board = board_.board_;
 
-  int start_dir_index = (is_type(piece, BISHOP)) ? 4 : 0;
-  int end_dir_index = (is_type(piece, ROOK)) ? 4 : 8;
+  auto friendly_color = get_color(piece);
+  auto opponent_color = opposite_color(friendly_color);
 
-  for (int dir_index = start_dir_index; dir_index < end_dir_index;
+  auto start_dir_index = (is_type(piece, BISHOP)) ? 4 : 0;
+  auto end_dir_index = (is_type(piece, ROOK)) ? 4 : 8;
+
+  for (auto dir_index = start_dir_index; dir_index < end_dir_index;
        dir_index++) {
-    for (int n = 0; n < num_squares_to_edge[start_square][dir_index]; n++) {
+    for (auto n = 0; n < num_squares_to_edge[start_square][dir_index]; n++) {
 
-      int target_square = start_square + direction_offsets[dir_index] * (n + 1);
-      piece_t target_piece = _board._board[target_square];
+      auto target_square = start_square + direction_offsets[dir_index] * (n + 1);
+      auto target_piece = board[target_square];
 
       if (is_color(target_piece, friendly_color)) {
         break;
       }
-      _moves.emplace_back(start_square, target_square);
-      _moves_set.emplace(start_square, target_square);
+
+      moves_.emplace_back(start_square, target_square);
+      moves_set_.emplace(start_square, target_square);
 
       if (is_color(target_piece, opponent_color)) {
         break;
       }
+
     }
   }
 }
 
-void StandardGame::generate_pawn_moves(int start_square, piece_t piece) {
+void StandardGame::generate_pawn_moves(square_t start_square, piece_t piece) {
 
-  int dir_index = is_color(piece, BLACK);
-  int target_square = start_square + direction_offsets[dir_index];
-  if (in_bounds(target_square) && _board._board[target_square] == EMPTY) {
+  auto& board = board_.board_;
 
-    _moves.emplace_back(start_square, target_square);
-    _moves_set.emplace(start_square, target_square);
+  auto dir_index = is_color(piece, BLACK);
+  auto target_square = start_square + direction_offsets[dir_index];
+  if (in_bounds(target_square) && board[target_square] == EMPTY) {
 
-    target_square = start_square + 2*direction_offsets[dir_index];
+    bool last_rank = on_eigth_rank(target_square) || on_first_rank(target_square);
+    auto promotion_flag = last_rank ? EMPTY : PROMOTION;
+    moves_.emplace_back(start_square, target_square);
+    moves_set_.emplace(start_square, target_square);
+
+    target_square += direction_offsets[dir_index];
     
     bool white_double = on_second_rank(start_square) && is_color(piece, WHITE);
     bool black_double = on_seventh_rank(start_square) && is_color(piece, BLACK);
-    if ((white_double || black_double) && _board._board[target_square] == EMPTY) {
-      _moves.emplace_back(start_square, target_square);
-      _moves_set.emplace(start_square, target_square);
+    if (in_bounds(target_square) && (white_double || black_double) && board[target_square] == EMPTY) {
+      moves_.emplace_back(start_square, target_square);
+      moves_set_.emplace(start_square, target_square);
     }
   }
 
-  vector<int> capture_indexes{4 + is_color(piece, BLACK), 6 + is_color(piece, BLACK)};
+  array<int, 2> capture_indexes{4 + is_color(piece, BLACK), 6 + is_color(piece, BLACK)};
 
   for (auto index : capture_indexes) {
     target_square = start_square + direction_offsets[index];
     if (!in_bounds(target_square)) continue;
     if (num_squares_to_edge[start_square][index] == 0) continue;
-    if (_board._board[target_square] == EMPTY && _board._en_passant_square != target_square) continue;
-    if (get_color(_board._board[target_square]) == get_color(piece)) continue;
-    _moves.emplace_back(start_square, target_square);
-    _moves_set.emplace(start_square, target_square);
+    if (board[target_square] == EMPTY && board_.en_passant_square_ != target_square) continue;
+    if (get_color(board[target_square]) == get_color(piece)) continue;
+    auto target_piece = board[target_square] == EMPTY ? 
+      PAWN | opposite_color(get_color(piece)) :
+      board[target_square];
+
+    moves_.emplace_back(start_square, target_square);
+    moves_set_.emplace(start_square, target_square);
   }
 
 }
 
-void StandardGame::generate_king_moves(int start_square, piece_t piece) {
+void StandardGame::generate_king_moves(square_t start_square, piece_t piece) {
 
+  auto& board = board_.board_;
+  auto color = board_.color_to_move_;
+
+  // moving 1 square
   for (int dir_index = 0; dir_index < 8; dir_index++) {
     if (num_squares_to_edge[start_square][dir_index] == 0) continue;
-    int target_square = start_square + direction_offsets[dir_index];
-    piece_t target_piece = _board._board[target_square];
-    bool same_team = get_color(piece) == get_color(target_piece);
-    if (!same_team) {
-      _moves.emplace_back(start_square, target_square);
-      _moves_set.emplace(start_square, target_square);
+    auto target_square = start_square + direction_offsets[dir_index];
+    auto target_piece = board[target_square];
+    bool capture = opposite_color(color) == get_color(target_piece);
+    if (capture) {
+      moves_.emplace_back(start_square, target_square);
+      moves_set_.emplace(start_square, target_square);
+    } else if (target_piece == EMPTY) {
+      moves_.emplace_back(start_square, target_square);
+      moves_set_.emplace(start_square, target_square);
     }
   }
 
   // castling
-  int shift_offset = 2 * is_color(piece, WHITE);
-
-  if (_board._castling_rights & (1 << (shift_offset + 1))) {
-    if (_board._board[start_square+1] == EMPTY && _board._board[start_square+2] == EMPTY) {
-      _moves.emplace_back(start_square, start_square+2);
-      _moves_set.emplace(start_square, start_square+2);
-    }
-  } else if (_board._castling_rights & (1 << shift_offset)) {
-    if (_board._board[start_square-1] == EMPTY && _board._board[start_square-2] == EMPTY) {
-      _moves.emplace_back(start_square, start_square-2);
-      _moves_set.emplace(start_square, start_square-2);
-    }
+  if (board_.can_castle_king_side(color)) {
+    auto target_square = start_square + 2;
+    moves_.emplace_back(start_square, target_square);
+    moves_set_.emplace(start_square, target_square);
+  }
+  if (board_.can_castle_queen_side(color)) {
+    auto target_square = start_square - 2;
+    moves_.emplace_back(start_square, target_square);
+    moves_set_.emplace(start_square, target_square);
   }
 
 }
 
-void StandardGame::generate_knight_moves(int start_square, piece_t piece) {
+void StandardGame::generate_knight_moves(square_t start_square, piece_t piece) {
 
-  int sx = start_square % NUM_ROW;
-  int sy = start_square / NUM_ROW;
+  xy_index(sx, sy, start_square)
+  auto& board = board_.board_;
+
   for (auto target_offset : knight_square_offsets) {
-    int target_square = start_square + target_offset;
-    int tx = target_square % NUM_ROW;
-    int ty = target_square / NUM_ROW;
+    auto target_square = start_square + target_offset;
+    auto tx = target_square % NUM_ROW;
+    auto ty = target_square / NUM_ROW;
     if (abs(tx - sx) + abs(ty - sy) == 3) { // TODO: CHANGE THIS LATER
-      piece_t target_piece = _board._board[target_square];
-      bool same_team = get_color(piece) == get_color(target_piece);
-      if (!same_team) {
-        _moves.emplace_back(start_square, target_square);
-        _moves_set.emplace(start_square, target_square);
+      auto target_piece = board[target_square];
+      bool capture = opposite_color(get_color(piece)) == get_color(target_piece);
+      if (capture) {
+        moves_.emplace_back(start_square, target_square);
+        moves_set_.emplace(start_square, target_square);
+      } else if (target_piece == EMPTY) {
+        moves_.emplace_back(start_square, target_square);
+        moves_set_.emplace(start_square, target_square);
       }
     }
   }
 
 }
 
-void StandardGame::generate_moves_for_piece(int start_square, piece_t piece) {
-  _moves.clear();
-  _moves_set.clear();
+void StandardGame::generate_moves_for_piece(square_t start_square, piece_t piece) {
+  moves_.clear();
+  moves_set_.clear();
   if (is_type(piece, PAWN)) {
     generate_pawn_moves(start_square, piece);
   } else if (is_type(piece, KNIGHT)) {
@@ -142,9 +162,9 @@ void StandardGame::generate_moves_for_piece(int start_square, piece_t piece) {
 
 // TOOD: test this function with 1-ply, 2-ply, etc. (need depth factor, color to move)
 void StandardGame::generate_moves() {
-  for (int start_square = 0; start_square < NUM_SQUARES; start_square++) {
-    piece_t piece = _board._board[start_square];
-    if (is_color(piece, _board._color_to_move)) {
+  for (square_t start_square = 0; start_square < NUM_SQUARES; start_square++) {
+    piece_t piece = board_.board_[start_square];
+    if (is_color(piece, board_.color_to_move_)) {
       if (is_sliding_piece(piece)) {
         generate_sliding_moves(start_square, piece);
       } else if (is_type(piece, PAWN)) {
@@ -160,122 +180,124 @@ void StandardGame::generate_moves() {
 }
 
 bool StandardGame::is_legal_move(const Move &move) {
-  LOG_DEBUG("selected %s", move.to_str().c_str());
-  return _moves_set.count(move);
+  return moves_set_.count(move);
 }
 
-void StandardGame::make_move(const Move &move, piece_t promotion_piece) {
+void StandardGame::make_move(const Move& move, piece_t promotion_piece) {
 
   // 1) assert turn is correct
-  if (_board._color_to_move != get_color(_board._board[move._from])) {
-    LOG_WARN("Player not allowed to make move, color: %d", _board._color_to_move);
+  if (board_.color_to_move_ != get_color(board_.board_[move.from_])) {
+    LOG_WARN("Player not allowed to make move, color: %d", board_.color_to_move_);
     return;
   }
 
-  // 2.5) validate move:
+  // TODO: validate move
+
+  print_move(move);
+
   if (is_legal_move(move)) {
+    auto& board = board_.board_;
+    auto piece = board[move.from_];
+    piece_t target_piece = board[move.to_];
+    piece_t captured_piece = EMPTY;
 
-    piece_t piece_moved = _board._board[move._from];
-    if (is_type(piece_moved, PAWN) && _board._board[move._to] == EMPTY) { // en passant capture
-      // TODO: change this when flipping the board (actually can implement in the GUI)
-      if (abs(abs(move._from - move._to) - NUM_ROW) == 1) { // diagonal movement
-        int dir_index = is_color(piece_moved, WHITE);
-        int target_square = move._to + direction_offsets[dir_index];
-        _board._event_history.emplace_back(_board._fullMoves+1, 
-                                                target_square,
-                                                _board._board[target_square]);
-        _board._board[target_square] = EMPTY; 
-        LOG_DEBUG("[en passant capture] @ %d", _board._fullMoves+1);
+    board_.en_passant_square_ = -1;
+    if (is_type(piece, PAWN)) {
+      if (is_en_passant_capture(piece, target_piece, move)) { // en passant
+        auto dir_index = is_color(piece, WHITE);
+        auto target_square = move.to_ + direction_offsets[dir_index];
+        // captured_piece = board[target_square]; // not needed
+        board[target_square] = EMPTY; 
+        LOG_DEBUG("[en passant capture] @ %d", board_.full_moves_+1);
+      } else if (on_first_rank(move.to_) || on_eigth_rank(move.to_)) { 
+        if (!is_promotion_piece(promotion_piece))
+          throw std::logic_error("Can't promote to requested piece type");
+        board[move.from_] = get_color(piece) | promotion_piece;
+        captured_piece = PROMOTION; // indictes a promotion occurred
+        LOG_DEBUG("[pawn promotion] @ %d", board_.full_moves_+1);
+        LOG_DEBUG("[piece promoted to] %d", promotion_piece);
+      } else if (is_double_square_pawn_push(piece, move)) {
+        board_.en_passant_square_ = move.to_ + direction_offsets[is_color(piece, WHITE)];
+        LOG_DEBUG("[double square pawn push] @ %d", board_.full_moves_);
       }
     }
+    captured_piece |= target_piece;
 
-    if (_board._board[move._to] != EMPTY) {
-      _board._event_history.emplace_back(_board._fullMoves+1, move._to, _board._board[move._to]);
-      LOG_DEBUG("[capture] @ %d", _board._fullMoves);
-      if (is_type(_board._board[move._to], ROOK)) {
-        switch(move._to) {
-          case 0:
-            _board._castling_rights &= 11;
-            break;
-          case 7:
-            _board._castling_rights &= 7;
-            break;
-          case 56:
-            _board._castling_rights &= 14;
-            break;
-          case 63:
-            _board._castling_rights &= 13;
-            break;
-          default:
-            // do nothing
-            break;
-        }
-      }
-    }
-
-    swap(_board._board[move._from], _board._board[move._to]);
-
-    _board._board[move._from] = EMPTY;
-    _board._color_to_move = opposite_color(_board._color_to_move);
-    _board._move_history.emplace_back(move._from, move._to);
-    _board._fullMoves = _board._move_history.size();
-    _board._en_passant_square = -1;
-
-    if (is_type(piece_moved, ROOK)) {
-      switch(move._from) {
+    if (is_type(target_piece, ROOK)) {  
+      // TAKING ROOK
+      switch(move.to_) {
         case 0:
-          _board._castling_rights &= 11;
+          board_.castling_rights_ &= 11;
           break;
         case 7:
-          _board._castling_rights &= 7;
+          board_.castling_rights_ &= 7;
           break;
         case 56:
-          _board._castling_rights &= 14;
+          board_.castling_rights_ &= 14;
           break;
         case 63:
-          _board._castling_rights &= 13;
+          board_.castling_rights_ &= 13;
           break;
         default:
           // do nothing
           break;
       }
-    } else if (is_type(piece_moved, KING)) {
-      if (move._to - move._from == 2) { // KING side castling
-        swap(_board._board[move._to + 1], _board._board[move._from + 1]);
-      } else if (move._to - move._from == -2) { // QUEEN side castling
-        swap(_board._board[move._to - 2], _board._board[move._from - 1]);
-      }
-      // remove castling rights
-      if (is_color(piece_moved, WHITE)) {
-        _board._castling_rights &= 3;
-      } else {
-        _board._castling_rights &= 12;
-      }
-    } else if (is_type(piece_moved, PAWN)) {
-      // recording whether en passant is possible
-      bool white_double = on_second_rank(move._from) && is_color(piece_moved, WHITE);
-      bool black_double = on_seventh_rank(move._from) && is_color(piece_moved, BLACK);
-      if ((white_double || black_double) && abs(move._from - move._to) == 16) {
-        _board._en_passant_square = move._to + direction_offsets[is_color(piece_moved, WHITE)];
-        _board._event_history.emplace_back(_board._fullMoves, _board._en_passant_square);
-        LOG_DEBUG("[en passant square] @ %d", _board._fullMoves);
-      }
-      // handle pawn promotion
-      if (on_first_rank(move._to) || on_eigth_rank(move._to)) {
-        if (!is_promotion_piece(promotion_piece))
-          throw std::logic_error("Can't promote to requested piece type");
-        _board._board[move._to] = get_color(piece_moved) | promotion_piece;
-        _board._event_history.emplace_back(_board._fullMoves);
-        LOG_DEBUG("[pawn promotion] @ %d", _board._fullMoves);
-      }
+      LOG_DEBUG("[captured rook] @ %d", board_.full_moves_ + 1);
     }
+    
+    
+    swap(board[move.from_], board[move.to_]);
+    board[move.from_] = EMPTY;
+
+    // changes in castling by moving
+    if (is_type(piece, ROOK)) { 
+      // losing castling rights by moving the rook
+      switch(move.from_) {
+        case 0:
+          board_.castling_rights_ &= 11;
+          break;
+        case 7:
+          board_.castling_rights_ &= 7;
+          break;
+        case 56:
+          board_.castling_rights_ &= 14;
+          break;
+        case 63:
+          board_.castling_rights_ &= 13;
+          break;
+        default:
+          // do nothing
+          break;
+      }
+      LOG_DEBUG("[rook moved] @ %d", board_.full_moves_);
+    } else if (is_type(piece, KING)) {
+      if (is_king_side_castling(piece, move)) {
+        // move rook
+        swap(board[move.to_ + 1], board[move.from_ + 1]);
+        LOG_DEBUG("[king side castling] @ %d", board_.full_moves_);
+
+      } else if (is_queen_side_castling(piece, move)) {
+        // move rook
+        swap(board[move.to_ - 2], board[move.from_ - 1]);
+        LOG_DEBUG("[queen side castling] @ %d", board_.full_moves_);
+      } 
+      board_.castling_rights_ &= (board_.color_to_move_ == WHITE ? 3 : 12);
+    }
+
+    
+    board_.color_to_move_ = opposite_color(board_.color_to_move_);
+    board_.move_history_.emplace_back(move, board_.castling_rights_, captured_piece, board_.en_passant_square_);
+    board_.full_moves_ = board_.move_history_.size();
+
+    LOG_DEBUG("caslting rights are %d", board_.castling_rights_);
+
   } else {
-    // TODO: throw exception
+
   }
+
 }
 
-void StandardGame::make_move(int from, int to, piece_t promotion_piece) {
-
+void StandardGame::make_move(square_t from, square_t to, piece_t promotion_piece) {
   make_move(Move(from, to), promotion_piece);
 }
 
@@ -289,98 +311,53 @@ void StandardGame::make_move(const string &move, piece_t promotion_piece) {
 }
 
 void StandardGame::undo_move() {
-  if (_board._move_history.empty()) {
+  if (board_.move_history_.empty()) {
     LOG_WARN("Can't undo move: move history is empty");
     return;
   }
 
-  auto& last_move = _board._move_history.back();
-  swap(_board._board[last_move._from], _board._board[last_move._to]);
-  piece_t last_moved_piece = _board._board[last_move._from];
+  auto& last_event = board_.move_history_.back();
+  auto& last_move = last_event.move_;
+  auto& board = board_.board_;
+  piece_t last_moved_piece = board[last_move.to_];
   color_t last_move_color = get_color(last_moved_piece);
+  
+  swap(board[last_move.from_], board[last_move.to_]);
 
-  if (is_type(last_moved_piece, KING)) {
-    if (last_move._to - last_move._from == 2) {
-      swap(_board._board[last_move._from + 1], _board._board[last_move._to + 1]);
-    } else if (last_move._to - last_move._from == -2) {
-      swap(_board._board[last_move._from - 1], _board._board[last_move._to - 2]);
+  // moving rook back
+  if (is_king_side_castling(last_moved_piece, last_move)) {
+    swap(board[last_move.from_ + 1], board[last_move.to_ + 1]);
+  } else if (is_queen_side_castling(last_moved_piece, last_move)) {
+    swap(board[last_move.from_ - 1], board[last_move.to_ - 2]);
+  }
+
+  // pawn promotion
+  if (on_eigth_rank(last_move.to_) || on_first_rank(last_move.to_)) {
+    if (last_event.captured_piece_ & PROMOTION) { // promotion
+      board[last_move.from_] = last_move_color | PAWN;
+      LOG_DEBUG("[undoing pawn promotion]");
     }
   }
   
+  if ((last_event.captured_piece_ & ~PROMOTION) != EMPTY) {
+    board[last_move.to_] = (last_event.captured_piece_ & ~PROMOTION);
+  }
   
-  // order is pawn promotions
-  if (!_board._event_history.empty()) {
-    auto& last_event = _board._event_history.back();
-    bool promotion = last_event._square == -1 && last_event._captured_piece == EMPTY;
-    if (_board._move_history.size() == last_event._index) {
-      if (promotion) {
-        LOG_DEBUG("Undoing promotion");
-        _board._board[last_move._from] = last_move_color | PAWN;
-        _board._event_history.pop_back();
-      }
-    }
-  }
-
-  // then castling
-  if (!_board._event_history.empty()) {
-    auto& last_event = _board._event_history.back();
-    bool castling = last_event._square == 64;
-    if (castling) {
-      LOG_DEBUG("Castling rights");
-      _board._castling_rights = last_event._captured_piece; // previous caslting rights state
-    }
-  }
-
+  // // TODO: create a function that identifies moves
+  board_.move_history_.pop_back();
+  board_.full_moves_ = board_.move_history_.size();
+  board_.color_to_move_ = opposite_color(board_.color_to_move_);
+  board_.en_passant_square_ = -1;
   
+  if (board_.move_history_.empty()) return;
+  auto& curr_last_event = board_.move_history_.back();
+  board_.en_passant_square_ = curr_last_event.en_passant_square_;
+  board_.castling_rights_ = curr_last_event.castling_rights_;
 
-  // , then capture (see make_move function)
-  if (!_board._event_history.empty()) {
-    auto& last_event = _board._event_history.back();
-    bool piece_captured = last_event._captured_piece != EMPTY && last_event._square != 64;
-    LOG_DEBUG("move history size %zu, last_event index %d", _board._move_history.size(), last_event._index);
-    if (_board._move_history.size() == last_event._index) {
-      if (piece_captured) {
-        LOG_DEBUG("Undoing piece capture");
-        _board._board[last_event._square] = last_event._captured_piece;
-        _board._event_history.pop_back();
-      }
-    }
-  }
-
-
-  // removing en passant square
-  _board._en_passant_square = EMPTY;
-  if (!_board._event_history.empty()) {
-
-    auto& last_event = _board._event_history.back();
-    bool en_passant_in_play = last_event._square != -1 && last_event._captured_piece == EMPTY;
-
-    if (_board._move_history.size() == last_event._index && en_passant_in_play) {
-      LOG_DEBUG("undoing a double pawn move");
-      _board._event_history.pop_back();
-    }
-
-  }
-
-
-  // TODO: create a function that identifies moves
-  _board._move_history.pop_back();
-  _board._fullMoves = _board._move_history.size();
-  _board._color_to_move = opposite_color(_board._color_to_move);
-  
-  // checking valid en passsant square AFTER
-  _board._en_passant_square = EMPTY;
-  if (!_board._event_history.empty()) {
-
-    auto& last_event = _board._event_history.back();
-    bool en_passant_in_play = last_event._square != -1 && last_event._captured_piece == EMPTY;
-    _board._en_passant_square = EMPTY;
-
-    // LOG_DEBUG("[EN PASSANT SQUARE] move history size %zu, last_event index %d", _board._move_history.size(), last_event._index);
-    if (_board._move_history.size() == last_event._index && en_passant_in_play) {
-      _board._en_passant_square = last_event._square;
-    }
-
+  // restore captured pawn if en passant
+  if (board_.en_passant_square_ == last_move.to_ && is_type(last_moved_piece, PAWN)) {
+    auto target_square = last_move.to_ + direction_offsets[last_move_color == WHITE];
+    board[target_square] = PAWN | opposite_color(last_move_color);
   }
   
 }

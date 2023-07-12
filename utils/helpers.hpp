@@ -32,7 +32,7 @@ void load_fen(Board<T> &chessboardInfo, const string &fen,
       int numEmptySquares = c - '0';
       index += numEmptySquares;
     } else {
-      chessboardInfo._board[index] = char_piece_map[c];
+      chessboardInfo.board_[index] = char_piece_map[c];
       index++;
     }
   }
@@ -43,7 +43,7 @@ void load_fen(Board<T> &chessboardInfo, const string &fen,
     int row = NUM_ROW - 1 - (square / NUM_ROW);
     int col = square % NUM_ROW;
     int target_square = row * NUM_ROW + col;
-    swap(chessboardInfo._board[square], chessboardInfo._board[target_square]);
+    swap(chessboardInfo.board_[square], chessboardInfo.board_[target_square]);
   }
 
   // Parse additional information
@@ -53,7 +53,7 @@ void load_fen(Board<T> &chessboardInfo, const string &fen,
     pos = additionalInfo.find(' ');
 
     if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-      chessboardInfo._color_to_move = additionalInfo[0];
+      chessboardInfo.color_to_move_ = additionalInfo[0];
       additionalInfo = additionalInfo.substr(pos + 1);
 
       pos = additionalInfo.find(' ');
@@ -68,12 +68,12 @@ void load_fen(Board<T> &chessboardInfo, const string &fen,
 
           pos = additionalInfo.find(' ');
           if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-            chessboardInfo._halfMoves = stoi(additionalInfo.substr(0, pos));
+            chessboardInfo.half_moves_ = stoi(additionalInfo.substr(0, pos));
             additionalInfo = additionalInfo.substr(pos + 1);
 
             pos = additionalInfo.find(' ');
             if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-              chessboardInfo._fullMoves = stoi(additionalInfo.substr(0, pos));
+              chessboardInfo.full_moves_ = stoi(additionalInfo.substr(0, pos));
             }
           }
         }
