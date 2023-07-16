@@ -7,6 +7,11 @@
 #include <iostream>
 
 #include "logger.hpp"
+#include "macros.hpp"
+
+#define linear_index(x,y) y * NUM_ROW + x
+#define xy_index(x,y,square) square_t x = square % NUM_ROW; \
+                             square_t y = square / NUM_ROW;
 
 using std::map, std::swap, std::min, std::string, std::to_string;
 
@@ -31,6 +36,22 @@ const piece_t QUEEN = 6;
 
 const color_t WHITE = 8;
 const color_t BLACK = 16;
+
+const map<piece_t, string> piece_string_map {
+  {EMPTY, "empty"},
+  {BLACK | KING,  "black king"},
+  {BLACK | PAWN,  "black pawn"},
+  {BLACK | KNIGHT,  "black knight"},
+  {BLACK | BISHOP,  "black bishop"},
+  {BLACK | ROOK,  "black rook"},
+  {BLACK | QUEEN,  "black queen"},
+  {WHITE | KING,  "white king"},
+  {WHITE | PAWN,  "white pawn"},
+  {WHITE | KNIGHT,  "white knight"},
+  {WHITE | BISHOP,  "white bishop"},
+  {WHITE | ROOK,  "white rook"},
+  {WHITE | QUEEN,  "white queen"}
+};
 
 const map<char, piece_t> char_piece_map{
     {'P', WHITE | PAWN}, {'N', WHITE | KNIGHT}, {'B', WHITE | BISHOP},
@@ -88,6 +109,10 @@ static void print_move(square_t from, square_t to) {
 
 static void print_move(const Move& move) {
   print_move(move.from_, move.to_);
+}
+
+static void print_piece(piece_t piece) {
+  LOG_DEBUG("printing piece ... %s", piece_string_map.at(piece).c_str());
 }
 
 // n,s,e,w,nw,se,ne,sw
@@ -166,11 +191,12 @@ const std::array<__int8_t, 8> knight_square_offsets{17, 10, -6, -15, -17, -10, 6
 
 inline bool is_color(piece_t piece, color_t color) { return piece & color; }
 
+inline bool is_type(piece_t piece, piece_t type) { return (piece & 7) == type; }
+
 inline bool is_sliding_piece(piece_t piece) {
-  return (piece & QUEEN) | (piece & ROOK) | (piece | BISHOP);
+  return is_type(piece, QUEEN) || is_type(piece, ROOK) || is_type(piece, BISHOP);
 }
 
-inline bool is_type(piece_t piece, piece_t type) { return (piece & 7) == type; }
 
 inline color_t opposite_color(color_t color) {
   return (color ^ 24); // 11000 ^ (WHITE or BLACK)
@@ -215,6 +241,24 @@ inline bool is_double_square_pawn_push(piece_t piece, const Move& move) {
   bool white_double = on_second_rank(move.from_) && is_color(piece, WHITE);
   bool black_double = on_seventh_rank(move.from_) && is_color(piece, BLACK);
   return (white_double || black_double) && abs(move.from_ - move.to_) == 2 * NUM_ROW;
+}
+
+inline bool on_line(int dir_id, square_t square1, square_t square2) {
+  xy_index(tx, ty, square2)
+  xy_index(sx, sy, square1)
+
+  switch(dir_id) {
+    case 0: // col
+      return sx == tx;
+    case 1: // row
+      return sy == ty;
+    case 2: // top left -> bottom right
+      return sx + sy == tx + ty;
+    case 3: // bottom left -> top right
+      return tx - sx == ty - sy;
+  }
+  CHESS_ASSERT(false, "invalid range for dir_id [0,3]");
+  return false;
 }
 
 }; // namespace chess

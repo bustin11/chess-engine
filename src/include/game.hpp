@@ -50,6 +50,10 @@ public:
 
   virtual bool is_legal_move(const Move &move);
 
+  array<square_t, NUM_SQUARES> get_attacking_counts();
+
+  array<square_t, NUM_SQUARES> get_xray_counts();
+
   Board<piece_t>& get_board() { return board_; }
 
 

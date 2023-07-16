@@ -41,6 +41,7 @@ static constexpr auto PastLastSlash(cstr a) -> cstr {
     sf__;                                                                      \
   })
 
+
 static constexpr int LOG_LEVEL_OFF = 1000;
 static constexpr int LOG_LEVEL_ERROR = 500;
 static constexpr int LOG_LEVEL_WARN = 400;
@@ -52,6 +53,7 @@ static constexpr int LOG_LEVEL_ALL = 0;
 #define LOG_LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
 #define LOG_OUTPUT_STREAM stdout
 
+#define LOG_LEVEL 450
 #ifndef LOG_LEVEL
 #ifndef NDEBUG
 static constexpr int LOG_LEVEL = LOG_LEVEL_DEBUG;

@@ -25,6 +25,33 @@ void Game::make_move(const string &move, piece_t promotion_piece) {}
 
 void Game::undo_move() {}
 
+array<square_t, NUM_SQUARES> Game::get_attacking_counts() {
+  array<square_t, NUM_SQUARES> attacking_squares;
+
+  auto meta_data_index = is_color(board_.color_to_move_, WHITE);
+  auto& meta_data = board_.meta_data_[meta_data_index];
+
+  auto& knp = meta_data.knp_attacking_counts_;
+  auto& qrb = meta_data.qrb_attacking_counts_;
+
+  for (auto square = 0; square < NUM_SQUARES; square++) {
+    attacking_squares[square] = knp[square] + qrb[square];
+    // LOG_DEBUG("square @ %d is %d", square, attacking_squares[square]);
+  }
+
+  return attacking_squares;
+}
+
+array<square_t, NUM_SQUARES> Game::get_xray_counts() {
+  array<square_t, NUM_SQUARES> attacking_squares;
+
+  auto meta_data_index = is_color(board_.color_to_move_, WHITE);
+  auto& meta_data = board_.meta_data_[meta_data_index];
+
+  auto& xray = meta_data.xray_counts_;
+  return xray;
+}
+
 bool Game::is_legal_move(const chess::Move &move) { return false; }
 
 void Game::set_board_fen(string fen) {

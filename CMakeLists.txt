@@ -13,6 +13,11 @@ project(main
 
 add_executable(main main.cpp) # top level
 
+# ================== dependencies =================================
+
+# Ctest
+enable_testing()
+
 # ==================== Must be added after configuring compilier parameters =========================
 
 
@@ -27,11 +32,18 @@ include_directories(${CHESS_SRC_INCLUDE_DIR} ${CHESS_THIRD_PARTY_INCLUDE_DIR} ut
 
 add_subdirectory(third_party)
 add_subdirectory(src)
+add_subdirectory(test)
 target_link_libraries(main chess)
+
+set_target_properties(main
+          PROPERTIES
+          RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/src"
+          COMMAND main
+          )
 # ==================== imgs =================================
 
 file(GLOB IMAGE_SOURCES "${PROJECT_SOURCE_DIR}/src/ui/imgs/*.png")
-message(${IMAGE_SOURCES})
+# message(${IMAGE_SOURCES})
 
 foreach(image_source ${IMAGE_SOURCES})
   message(${image_source})
@@ -65,3 +77,4 @@ add_custom_target(
         -i
         ${ALL_SOURCE_FILES}
 )
+

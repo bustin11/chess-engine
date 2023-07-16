@@ -40,6 +40,8 @@ public:
 
   virtual void undo_move() override;
 
+  // implement showing xrays, qrb and knp attacking squares
+
 };
 
 }; // namespace chess

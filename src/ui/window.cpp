@@ -2,10 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <math.h>
 #include <GL/glut.h>
 #include <SOIL/SOIL.h> // Include SOIL library for loading image textures
 
 #include "window.hpp"
+#include "fens.hpp"
 
 // TODO: add castling, en passant, and promotion to queen
 
@@ -45,6 +47,58 @@ void drawSquare(int x, int y, float r, float g, float b, float a = 1.0f) {
     glEnd();
 }
 
+void drawXinSquare(int x, int y, float r, float g, float b) {
+    // Calculate the center coordinates of the specified square
+    int centerX = x * 100 + 50;
+    int centerY = y * 100 + 50;
+
+    // Set the color of the lines
+    glColor3f(r, g, b); // Red color
+
+    // Set the line width
+    glLineWidth(2.0);
+
+    // Draw the lines to create an "X"
+    glBegin(GL_LINES);
+    glVertex2f(centerX - 30, centerY - 30);
+    glVertex2f(centerX + 30, centerY + 30);
+    glVertex2f(centerX - 30, centerY + 30);
+    glVertex2f(centerX + 30, centerY - 30);
+    glEnd();
+}
+
+void drawAinSquare(int x, int y, float r, float g, float b) {
+    // Calculate the center coordinates of the specified square
+    int centerX = x * 100 + 50;
+    int centerY = y * 100 + 50;
+
+    // Set the color of the lines and polygons
+    glColor3f(r, g, b); // Blue color
+
+    // Set the radius of the circle
+    float radius = 40.0f;
+
+    // Set the number of slices for the circle (more slices = smoother circle)
+    int slices = 100;
+
+    // Set the number of loops for the circle (more loops = higher quality circle)
+    int loops = 100;
+
+    // Set the number of segments for the circle
+    int numSegments = 100;
+
+    // Draw the circle using line segments
+    glBegin(GL_LINE_LOOP);
+    for (int i = 0; i < numSegments; ++i)
+    {
+        float theta = 2.0f * M_PI * float(i) / float(numSegments);
+        float x = radius * cos(theta);
+        float y = radius * sin(theta);
+        glVertex2f(centerX + x, centerY + y);
+    }
+    glEnd();
+}
+
 void drawChessPiece(int x, int y, GLuint texture) {
     glEnable(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -71,6 +125,7 @@ void drawChessPiece(int x, int y, GLuint texture) {
     glDisable(GL_TEXTURE_2D);
 }
 
+bool enable_attacking_squares = true;
 color_t promotionColor;
 bool selectingPromotionPiece = false;
 int move_from=-1, move_to=-1;
@@ -97,6 +152,8 @@ void handleMouseClick(int button, int state, int x, int y) {
           for (auto& move : game->get_moves()) {
             print_move(move);
           }
+          
+
           LOG_TRACE("selected");
         }
       } else if (selectedPieceX != boardX || selectedPieceY != boardY) {
@@ -233,6 +290,21 @@ void drawCheckeredBoard() {
     print_move(from, to);
   }
 
+  if (enable_attacking_squares && isPieceSelected) {
+    auto attacking_counts = game->get_attacking_counts();
+    auto xray_counts = game->get_xray_counts();
+    for (auto square = 0; square < chess::NUM_SQUARES; square++) {
+      if (attacking_counts[square] > 0) {
+        xy_index(x, y, square);
+        drawAinSquare(x, y, 1.0f, 0, 0);
+      } 
+      if (xray_counts[square] > 0) {
+        xy_index(x, y, square);
+        drawXinSquare(x, y, 0, 1.0f, 0);
+      }
+    }
+  }
+
 }
 
 void display() {
@@ -276,7 +348,7 @@ void myInit() {
 
   game = new StandardGame();
   LOG_DEBUG("%zu", sizeof(StandardGame));
-  game->set_board_fen(chess::FEN_START);
+  game->set_board_fen(fen::FEN_POSITION_5); // TODO: CHANGE THIS LATER
 
 
   // Load image textures for chess pieces

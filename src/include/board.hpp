@@ -14,17 +14,12 @@
 
 #include "piece.hpp"
 
-#define linear_index(x,y) y * NUM_ROW + x
-#define xy_index(x,y,square) square_t x = square % NUM_ROW; \
-                             square_t y = square / NUM_ROW;
+
 
 using chess::piece_t, chess::color_t;
 using std::string, std::array, std::vector, std::pair, std::set;
 
 namespace chess {
-
-const string FEN_START =
-    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 template <typename T> class Board {
 
@@ -47,9 +42,10 @@ struct Event {
 struct MetaData {
   set<square_t> piece_location_ = {}; // 0/1 := black/white
 
-  array<T, NUM_SQUARES> knp_attacking_counts_ = {}; // double check/check
-  array<T, NUM_SQUARES> qrb_attacking_counts_ = {}; // blocking
-  array<T, NUM_SQUARES> xray_counts_ = {}; // pins
+  square_t king_position_ = {};
+  array<square_t, NUM_SQUARES> knp_attacking_counts_ = {}; // double check/check, castling
+  array<square_t, NUM_SQUARES> qrb_attacking_counts_ = {}; // blocking, castling
+  array<square_t, NUM_SQUARES> xray_counts_ = {}; // pins, breaking pins, en passants
   // capturing is done with the board itself
 };
 
@@ -58,80 +54,7 @@ public:
   friend class Game;
   friend class StandardGame;
 
-  void load_from_fen(const string &fen) {
-
-    LOG_TRACE("loading fen: %s", fen.c_str());
-    // place pieces on board
-    int index = 0;
-    for (char c : fen) {
-      if (c == ' ')
-        break;
-      if (c == '/') {
-        continue;
-      } else if (c >= '1' && c <= '8') {
-        int numEmptySquares = c - '0';
-        index += numEmptySquares;
-      } else {
-        board_[index] = char_piece_map.at(c);
-          printf("%d ", board_[index]);
-        index++;
-      }
-    }
-
-    // fen starts upper left to bottom right
-    // my board starts from bottom left to upper right
-    for (square_t square = 0; square < NUM_SQUARES / 2; square++) {
-      square_t row = NUM_ROW - 1 - (square / NUM_ROW);
-      square_t col = square % NUM_ROW;
-      square_t target_square = row * NUM_ROW + col;
-      swap(board_[square], board_[target_square]);
-    }
-
-    // Parse additional information
-    size_t pos = fen.find(' ');
-    if (pos != string::npos && pos + 1 < fen.size()) {
-      string additionalInfo = fen.substr(pos + 1);
-      pos = additionalInfo.find(' ');
-      LOG_DEBUG("%s",additionalInfo.c_str());
-
-      if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-        color_to_move_ = additionalInfo[0] == 'w' ? WHITE : BLACK;
-        additionalInfo = additionalInfo.substr(pos + 1);
-LOG_DEBUG("%s",additionalInfo.c_str());
-        pos = additionalInfo.find(' ');
-        if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-          string castling = additionalInfo.substr(0, pos);
-          string KQkq = "KQkq";
-          for (int i = 3; i >= 0; i--) {
-            if (castling.find(KQkq[i]) != string::npos) {
-              castling_rights_ |= (1 << i);
-            }
-          }
-          LOG_DEBUG("castling rights are %d", castling_rights_);
-          additionalInfo = additionalInfo.substr(pos + 1);
-LOG_DEBUG("%s",additionalInfo.c_str());
-          pos = additionalInfo.find(' ');
-          if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-            if (additionalInfo.substr(0, pos) != "-")
-              en_passant_square_ = move_index_map.at(additionalInfo.substr(0, pos));
-
-            additionalInfo = additionalInfo.substr(pos + 1);
-LOG_DEBUG("%s",additionalInfo.c_str());
-            pos = additionalInfo.find(' ');
-            if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-              half_moves_ = stoi(additionalInfo.substr(0, pos));
-              additionalInfo = additionalInfo.substr(pos + 1);
-LOG_DEBUG("%s",additionalInfo.c_str());
-              pos = additionalInfo.find(' ');
-              if (pos != string::npos && pos + 1 < additionalInfo.size()) {
-                full_moves_ = stoi(additionalInfo.substr(0, pos));
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  void load_from_fen(const string &fen);
 
   inline bool can_castle_king_side(color_t color) const {
     if (color == WHITE) {
@@ -147,15 +70,47 @@ LOG_DEBUG("%s",additionalInfo.c_str());
     return (castling_rights_ & (1 << 0)) && board_[59] == EMPTY && board_[58] == EMPTY && board_[57] == EMPTY;
   }
 
+
+  void dump_data();
+
+  bool is_pinned_left_diagonal(square_t start_square, bool hypothetical = false); 
+  bool is_pinned_right_diagonal(square_t start_square, bool hypothetical = false); 
+  bool is_pinned_row(square_t start_square, bool hypothetical = false) ; 
+  bool is_pinned_col(square_t start_square, bool hypothetical = false);
+
   array<T, NUM_SQUARES> board_ = {}; // The chessboard
   color_t color_to_move_ = WHITE;  // Whose turn it is ('w' for white, 'b' for black)
-  __uint8_t castling_rights_ = 15;  // Castling rights (e.g., "KQkq"), 1101, ie, means KQq
+  __uint8_t castling_rights_ = {};  // Castling rights (e.g., "KQkq"), 1101, ie, means KQq
   square_t en_passant_square_ = EMPTY; // En passant target square (e.g., "e3")
   int half_moves_{};          // Half-moves since last pawn move or capture
   int full_moves_{};          // Full moves counter
   vector<Event> move_history_ = {};
-  array<MetaData, 2> meta_data_;
+  array<MetaData, 2> meta_data_ = {};
+
+private:
+  bool is_pinned_on_line(int diag_id, square_t start_square, bool hypothetical = false);
+  inline bool king_in_sliding_check(square_t target_square = -1) {
+    auto king_pos = target_square == -1 ? 
+      meta_data_[color_to_move_ == WHITE].king_position_ : target_square;
+    auto& qrb = meta_data_[color_to_move_ == BLACK].qrb_attacking_counts_;
+    return qrb[king_pos] > 0; 
+  }
+  inline bool king_in_non_sliding_check(square_t target_square = -1) {
+    auto king_pos = target_square == -1 ? 
+      meta_data_[color_to_move_ == WHITE].king_position_ : target_square;
+    auto& knp = meta_data_[color_to_move_ == BLACK].knp_attacking_counts_;
+    return knp[king_pos] > 0; 
+  }
+  bool king_in_check(square_t target_square = -1, bool check_xrays = false);
+  bool still_check_without(square_t start_square, piece_t piece);
+  bool still_check_with(square_t start_square, piece_t piece);
+  bool king_in_double_check();
+
+  __uint8_t original_castling_rights_ = {};  // Castling rights (e.g., "KQkq"), 1101, ie, means KQq
+  square_t original_en_passant_square_ = EMPTY; // En passant target square (e.g., "e3")
 
 };
+
+
 
 }; // namespace chess
