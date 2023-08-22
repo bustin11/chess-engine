@@ -1,4 +1,6 @@
 
+
+# https://cmake.org/cmake/help/latest/module/GoogleTest.html
 include(GoogleTest)
 
 file(GLOB_RECURSE CHESS_TEST_SOURCES "${PROJECT_SOURCE_DIR}/test/*test.cpp")
@@ -16,6 +18,7 @@ foreach (chess_test_source ${CHESS_TEST_SOURCES})
   
   # Add the test target separately and as part of "make check-tests".
   add_executable(${chess_test_name} EXCLUDE_FROM_ALL ${chess_test_source})
+
   add_dependencies(build-tests ${chess_test_name})
   add_dependencies(check-tests ${chess_test_name})
 

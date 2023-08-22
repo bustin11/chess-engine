@@ -4,13 +4,14 @@
 #include <GL/glut.h>
 #include <SOIL/SOIL.h> // Include SOIL library for loading image textures
 
+#include "board_model.hpp"
+#include "coord.hpp"
+#include "game.hpp"
 #include "logger.hpp"
-#include "standard_game.hpp"
-
-using namespace chess;
+#include "player.hpp"
 
 namespace gui {
 
-int window_run(int argc, char** argv);
+auto WindowRun(int argc, char **argv) -> int;
 
-}; // namespace chess
+}; // namespace gui

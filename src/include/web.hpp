@@ -9,12 +9,12 @@
 
 #pragma once
 
-#include <string.h>
+#include <cstring>
 
+#include "game.hpp"
 #include "httplib/httplib.h"
 #include "logger.hpp"
 #include "macros.hpp"
-#include "standard_game.hpp"
 
 namespace chess {
 
@@ -22,17 +22,18 @@ const int DEFAULT_PORT = 8080;
 
 class Web {
 public:
-  Web(int port = DEFAULT_PORT);
-  void run();
+  explicit Web(int port = DEFAULT_PORT);
+  ~Web();
+  void Run();
 
   Web(const Web &) = delete;
-  Web &operator=(const Web &) = delete;
+  auto operator=(const Web &) -> Web & = delete;
   Web(Web &&) = delete;
-  Web &operator=(Web &&) = delete;
+  auto operator=(Web &&) -> Web & = delete;
 
 private:
-  Game _game;
-  int _port;
+  Game *game_;
+  int port_;
 };
 
 } // namespace chess

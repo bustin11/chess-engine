@@ -1,6 +1,6 @@
 
 add_library(
-  chess_web
+  chess_ui
   OBJECT 
   web.cpp
   window.cpp
@@ -9,7 +9,7 @@ add_library(
 
 
 set(ALL_OBJECT_FILES
-  ${ALL_OBJECT_FILES} $<TARGET_OBJECTS:chess_web>
+  ${ALL_OBJECT_FILES} $<TARGET_OBJECTS:chess_ui>
   PARENT_SCOPE
 )
 

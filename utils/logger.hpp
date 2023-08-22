@@ -18,42 +18,41 @@ namespace chess {
 using cstr = const char *;
 
 // internal linkage + computed at compiled time
-static constexpr auto PastLastSlash(cstr a, cstr b) -> cstr {
+static constexpr auto PastLastSlash(chess::cstr a, chess::cstr b) -> chess::cstr {
   return *a == '\0'  ? b
          : *a == '/' ? PastLastSlash(a + 1, a + 1)
                      : PastLastSlash(a + 1, b);
 }
 
-static constexpr auto PastLastSlash(cstr a) -> cstr {
+static constexpr auto PastLastSlash(chess::cstr a) -> chess::cstr {
   return PastLastSlash(a, a);
 }
 
 #define __SHORT_FILE__                                                         \
   ({                                                                           \
-    constexpr cstr sf__{PastLastSlash(__FILE__)};                              \
+    constexpr chess:: sf__{chess::PastLastSlash(__FILE__)};                              \
     sf__;                                                                      \
   })
 
 // {} scopr forces the expression to be computed at compile time
 #define __SHORT_FILE                                                           \
   ({                                                                           \
-    constexpr cstr sf__{PastLastSlash(__FILE__)};                              \
+    constexpr chess::cstr sf__{chess::PastLastSlash(__FILE__)};                              \
     sf__;                                                                      \
   })
 
-
-static constexpr int LOG_LEVEL_OFF = 1000;
-static constexpr int LOG_LEVEL_ERROR = 500;
-static constexpr int LOG_LEVEL_WARN = 400;
-static constexpr int LOG_LEVEL_INFO = 300;
-static constexpr int LOG_LEVEL_DEBUG = 200;
-static constexpr int LOG_LEVEL_TRACE = 100;
-static constexpr int LOG_LEVEL_ALL = 0;
+#define LOG_LEVEL_OFF 1000
+#define LOG_LEVEL_ERROR 500
+#define LOG_LEVEL_WARN 400
+#define LOG_LEVEL_INFO 300
+#define LOG_LEVEL_DEBUG 200
+#define LOG_LEVEL_TRACE 100
+#define LOG_LEVEL_ALL 0
 
 #define LOG_LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
 #define LOG_OUTPUT_STREAM stdout
 
-#define LOG_LEVEL 450
+#define LOG_LEVEL LOG_LEVEL_OFF
 #ifndef LOG_LEVEL
 #ifndef NDEBUG
 static constexpr int LOG_LEVEL = LOG_LEVEL_DEBUG;
@@ -67,7 +66,7 @@ static constexpr int LOG_LEVEL = LOG_LEVEL_INFO;
 #define __FUNCTION__ ""
 #endif
 
-void OutputLogHeader(cstr file, int line, cstr func, int level);
+void OutputLogHeader(chess::cstr file, int line, chess::cstr func, int level);
 
 // :: means global namespace
 
@@ -77,7 +76,7 @@ void OutputLogHeader(cstr file, int line, cstr func, int level);
 #if LOG_LEVEL <= LOG_LEVEL_ERROR
 #define LOG_ERROR_ENABLED
 #define LOG_ERROR(...)                                                         \
-  OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_ERROR);      \
+  chess::OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_ERROR);      \
   ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                   \
   fprintf(LOG_OUTPUT_STREAM, "\n");                                            \
   ::fflush(stdout)
@@ -92,7 +91,7 @@ void OutputLogHeader(cstr file, int line, cstr func, int level);
 #if LOG_LEVEL <= LOG_LEVEL_WARN
 #define LOG_WARN_ENABLED
 #define LOG_WARN(...)                                                          \
-  OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_WARN);       \
+  chess::OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_WARN);       \
   ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                   \
   fprintf(LOG_OUTPUT_STREAM, "\n");                                            \
   ::fflush(stdout)
@@ -104,7 +103,7 @@ void OutputLogHeader(cstr file, int line, cstr func, int level);
 #if LOG_LEVEL <= LOG_LEVEL_INFO
 #define LOG_INFO_ENABLED
 #define LOG_INFO(...)                                                          \
-  OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_INFO);       \
+  chess::OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_INFO);       \
   ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                   \
   fprintf(LOG_OUTPUT_STREAM, "\n");                                            \
   ::fflush(stdout)
@@ -116,7 +115,7 @@ void OutputLogHeader(cstr file, int line, cstr func, int level);
 #if LOG_LEVEL <= LOG_LEVEL_DEBUG
 #define LOG_DEBUG_ENABLED
 #define LOG_DEBUG(...)                                                         \
-  OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_DEBUG);      \
+  chess::OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_DEBUG);      \
   ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                   \
   fprintf(LOG_OUTPUT_STREAM, "\n");                                            \
   ::fflush(stdout)
@@ -128,7 +127,7 @@ void OutputLogHeader(cstr file, int line, cstr func, int level);
 #if LOG_LEVEL <= LOG_LEVEL_TRACE
 #define LOG_TRACE_ENABLED
 #define LOG_TRACE(...)                                                         \
-  OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_TRACE);      \
+  chess::OutputLogHeader(__SHORT_FILE, __LINE__, __FUNCTION__, LOG_LEVEL_TRACE);      \
   ::fprintf(LOG_OUTPUT_STREAM, __VA_ARGS__);                                   \
   fprintf(LOG_OUTPUT_STREAM, "\n");                                            \
   ::fflush(stdout)
@@ -138,12 +137,12 @@ void OutputLogHeader(cstr file, int line, cstr func, int level);
 #endif
 
 // example [INFO] [file_name:line_number:func()] 2023:7:02 10:57:00
-inline void OutputLogHeader(cstr file, int line, cstr func, int level) {
+inline void OutputLogHeader(chess::cstr file, int line, chess::cstr func, int level) {
   time_t t = ::time(nullptr);
   tm *curTime = localtime(&t); // NOLINT
   char time_str[32];
   ::strftime(time_str, 32, LOG_LOG_TIME_FORMAT, curTime);
-  cstr type;
+  chess::cstr type;
   switch (level) {
   case LOG_LEVEL_ERROR:
     type = "ERROR";

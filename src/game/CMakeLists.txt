@@ -3,7 +3,6 @@ add_library(
   chess_game
   OBJECT 
   game.cpp
-  standard_game.cpp
 )
 
 

@@ -4,6 +4,7 @@ add_library(
   chess_board
   OBJECT 
   board.cpp
+  board_model.cpp
 )
 
 

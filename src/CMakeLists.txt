@@ -3,13 +3,19 @@
 add_subdirectory(board)
 add_subdirectory(game)
 add_subdirectory(ui)
+add_subdirectory(move)
+add_subdirectory(player)
+add_subdirectory(piece)
 
 add_library(chess STATIC ${ALL_OBJECT_FILES})
 
 set(CHESS_LIBS
   chess_board
   chess_game
-  chess_web
+  chess_ui
+  chess_move
+  chess_player
+  chess_piece
 )
 
 

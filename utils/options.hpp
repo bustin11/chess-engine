@@ -71,7 +71,7 @@ private:
             // https://levelup.gitconnected.com/understanding-std-visit-in-c-a-type-safe-way-to-traverse-variant-objects-dbeff9b47003
             std::visit(
                 [this, idx, &argv](auto &&arg) {
-                  if (idx < argv.size() - 1) {
+                  if (idx < static_cast<int>(argv.size()) - 1) {
                     std::stringstream value;
                     value << argv[idx + 1];
                     value >> this->*arg;

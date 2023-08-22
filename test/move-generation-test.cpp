@@ -1,208 +1,160 @@
+// https://www.chessprogramming.org/Perft_Results
 
-
-#include <cstdio>
-#include <random>
-#include <string>
+#include <stdio.h>
+#include <ctime>
 
 #include "fens.hpp"
-#include "standard_game.hpp"
+#include "game.hpp"
+
 #include "gtest/gtest.h"
-
-
 namespace chess {
 
-// TODO: fix this with ::fmt
-void test_print_move(square_t from, square_t to) {
-  int from_x = from % NUM_ROW;
-  int from_y = from / NUM_ROW;
+auto GetMoveString(int from, int to, bool is_promotion = false) -> std::string {
+  int from_x = from % 8;
+  int from_y = from / 8;
 
-  int to_x = to % NUM_ROW;
-  int to_y = to / NUM_ROW;
-  string s = "(" + to_string(from_x) + ", " + to_string(from_y) + ")";
-  s += " -> ";
-  s += "(" + to_string(to_x) + ", " + to_string(to_y) + ")";
-  printf("%s", s.c_str());
-}
+  int to_x = to % 8;
+  int to_y = to / 8;
 
-void test_print_move(const Move& move) {
-  print_move(move.from_, move.to_);
-}
-
-// Check if game is correct, ie, all moves are legal, and all legal moves are present
-TEST(MoveGenerationTest, DISABLED_CountLegalMoves) {
-  // TODO: fix any bugs that come with move generation
-
-  vector<long long> ply(4);
-
-  for (int i = 1; i < ply.size(); i++) {
-    Game* game = new StandardGame();
-    game->set_board_fen(fen::FEN_POSITION_5);
-
-    std::function<long long(int, int)> count_moves = [&game, &count_moves](int depth, int total) {
-
-      if (depth == total) return 1LL;
-
-      auto color = (depth & 1) ? BLACK : WHITE;
-
-      long long count = 0;
-      game->generate_moves();
-      auto all_moves = game->get_moves();
-      for (auto& move : all_moves) {
-        try {
-          
-          game->make_move(move);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-        } catch (std::exception& e) {
-          game->make_move(move, color | QUEEN);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-
-          game->make_move(move, color | ROOK);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-
-          game->make_move(move, color | BISHOP);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-
-          game->make_move(move, color | KNIGHT);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-        }
-        
-      }
-
-      return count;
-
-    };
-
-    ply[i] = count_moves(0, i);
-    printf("[%d-ply count] -- %lld\n", i, ply[i]);
-    delete game;
+  BoardModel::SquareNameFromCoordinate(Coord(from_x, from_y));
+  std::string s = BoardModel::SquareNameFromCoordinate(Coord(from_x, from_y));
+  s += BoardModel::SquareNameFromCoordinate(Coord(to_x, to_y));
+  if (is_promotion) {
+    s += "*";
   }
-
-  ASSERT_TRUE(true);
-
+  return s;
 }
 
-// Check if game is correct, ie, all moves are legal, and all legal moves are present
-TEST(MoveGenerationTest, DISABLED_Position4) {
-  // TODO: fix any bugs that come with move generation
+auto GetMoveString(const Move& move) -> std::string {
+  return GetMoveString(move.Start(), move.End(), move.IsPromotion());
+}
 
-  vector<long long> ply(4);
-  
-  for (int i = 3; i < ply.size(); i++) {
-    Game* game = new StandardGame();
-    game->set_board_fen(fen::FEN_POSITION_4);
+// TODO(justinhsu): fix this with ::fmt
+void TestPrintMove(int from, int to) {
+  printf("%s\n", GetMoveString(from, to).c_str());
+}
 
-    std::function<long long(int, int)> count_moves = [&game, &count_moves](int depth, int total) {
+void TestPrintMove(const Move &move) { 
+  printf("%s\n", GetMoveString(move).c_str());
+}
 
-      if (depth == total) return 1LL;
+long long TestPositionWithPlyCount(const string& fen, int ply_count) {
+  auto *board = new Board();
+  board->LoadPosition(fen);
+  auto move_generator = new chess::MoveGenerator();
 
-      auto color = (depth & 1) ? BLACK : WHITE;
-      // auto color = (depth & 1) ? WHITE : BLACK;
+  std::function<long long(int)> count_moves = 
+    [&move_generator, &board, &count_moves](int depth) {
+    
+    if (depth == 0) return 1LL;
 
-      long long count = 0;
-      game->generate_moves();
-      auto all_moves = game->get_moves();
-      for (auto& move : all_moves) {
-        try {
-          game->make_move(move);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-        } catch (std::exception& e) {
-          game->make_move(move, color | QUEEN);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
+    long long count = 0;
+    auto all_moves = move_generator->GenerateMoves(board);
+    for (auto &move : all_moves) {
+      board->MakeMove(move, true);
+      count += count_moves(depth - 1);
+      board->UndoMove(move, true);
+    }
 
-          game->make_move(move, color | ROOK);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
+    return count;
+  };
 
-          game->make_move(move, color | BISHOP);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
+  long long counts = count_moves(ply_count);
+  delete board;
+  delete move_generator;
+  return counts;
+}
 
-          game->make_move(move, color | KNIGHT);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-        }
-        
-      }
+long long TestPositionWithPlyCountDebug(const string& fen, int ply_count) {
+  auto *board = new Board();
+  board->LoadPosition(fen);
+  auto move_generator = new chess::MoveGenerator();
 
-      return count;
+  std::function<long long(int, std::string)> count_moves = 
+    [&move_generator, &board, &count_moves](int depth, string s = "") {
+    // if (s.length() > 0)
+      // printf("%s\n", s.c_str());
+    
+    if (depth == 0) return 1LL;
 
-    };
+    long long count = 0;
+    auto all_moves = move_generator->GenerateMoves(board);
+    for (auto &move : all_moves) {
+      board->MakeMove(move, true);
+      count += count_moves(depth - 1, s + GetMoveString(move));
+      board->UndoMove(move, true);
+    }
+    // TODO(justin): change me!
+    if (s.length() < 6)
+      printf("%s: %lld\n", s.c_str(), count);
 
-    ply[i] = count_moves(0, 3);
-    printf("[%d-ply count] -- %lld\n", i, ply[i]);
-    delete game;
+    return count;
+  };
+
+  long long counts = count_moves(ply_count, "");
+  delete board;
+  delete move_generator;
+  return counts;
+}
+
+void TestWrapper(const char* fen_name, const string& fen,
+                  std::vector<long long> &correct_values, bool debug = false) {
+  int ply_count = 1;
+  for (auto val : correct_values) {
+    int tt = clock();
+    long long counts = 0;
+    if (debug) counts = TestPositionWithPlyCountDebug(fen, ply_count);
+    else counts = TestPositionWithPlyCount(fen, ply_count);
+    int elapsed_time = 1000 * (clock() - tt) / CLOCKS_PER_SEC;
+    printf("[%s(%d ms)]: ply count of %d = %lld\n", fen_name, elapsed_time, ply_count, counts);
+    fflush(stdout);
+    if (!debug) ASSERT_TRUE(counts == val);
+    ply_count++;
   }
-
-  ASSERT_TRUE(true);
-
 }
 
-TEST(MoveGenerationTest, Position5) {
-  // TODO: fix any bugs that come with move generation
 
-  vector<long long> ply(4);
-  
-  for (int i = 3; i < ply.size(); i++) {
-    Game* game = new StandardGame();
-    game->set_board_fen(fen::FEN_POSITION_5);
-    // game->make_move("e1g1", WHITE | KNIGHT);
-    // game->make_move("e8d8");
 
-    std::function<long long(int, int)> count_moves = [&game, &count_moves](int depth, int total) {
 
-      if (depth == total) return 1LL;
-
-      auto color = (depth & 1) ? BLACK : WHITE;
-      // auto color = (depth & 1) ? WHITE : BLACK;
-
-      long long count = 0;
-      game->generate_moves();
-      auto all_moves = game->get_moves();
-      // if (all_moves.size() == 0) return 1LL;
-      for (auto& move : all_moves) {
-        try {
-          game->make_move(move);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-        } catch (std::exception& e) {
-          game->make_move(move, color | QUEEN);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-
-          game->make_move(move, color | ROOK);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-
-          game->make_move(move, color | BISHOP);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-
-          game->make_move(move, color | KNIGHT);
-          count += count_moves(depth + 1, total);
-          game->undo_move();
-        }
-        
-      }
-
-      return count;
-
-    };
-
-    ply[i] = count_moves(0, 3);
-    printf("[%d-ply count] -- %lld\n", i, ply[i]);
-    // ASSERT_TRUE(ply[i] == 2103487);
-    delete game;
-  }
-
-  ASSERT_TRUE(true);
-
+// =========================== STARTING POSITION
+TEST(MoveGenerationTest, Position1_TEST) {
+  const char* fen_name = "Position 2";
+  std::vector<long long> correct_values{20, 400, 8902, 197281, 4865609, 119060324}; 
+  std::string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  TestWrapper(fen_name, fen, correct_values);
 }
 
-}  // namespace bustub
+// Check if game is correct, ie, all moves are legal, and all legal moves are
+TEST(MoveGenerationTest, Position2_TEST) {
+  const char* fen_name = "Position 2";
+  std::vector<long long> correct_values{48, 2039, 97862, 4085603, 193690690}; 
+  std::string fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+  TestWrapper(fen_name, fen, correct_values);
+}
+
+TEST(MoveGenerationTest, Position3_TEST) {
+  const char* fen_name = "Position 3";
+  std::vector<long long> correct_values{14, 191, 2812, 43238, 674624, 11030083, 178633661}; 
+  std::string fen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -";
+  TestWrapper(fen_name, fen, correct_values);
+}
+
+TEST(MoveGenerationTest, Position4_TEST) {
+  const char* fen_name = "Position 4";
+  std::vector<long long> correct_values{6, 264, 9467, 422333, 15833292};
+  TestWrapper(fen_name, fen::FEN_POSITION_4, correct_values);
+}
+
+TEST(MoveGenerationTest, Position5_TEST) {
+  const char* fen_name = "Position 5";
+  std::vector<long long> correct_values{44, 1486, 62379, 2103487, 89941194};
+  TestWrapper(fen_name, fen::FEN_POSITION_5, correct_values);
+}
+
+TEST(MoveGenerationTest, Position6_TEST) {
+  const char* fen_name = "Position 6";
+  std::vector<long long> correct_values{46, 2079, 89890, 3894594, 164075551};
+  TestWrapper(fen_name, "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", correct_values);
+}
+
+}  // namespace chess

@@ -1,73 +1,67 @@
 /**
- * TODO:
- * 1. copy-elision/copy and swap?
- * 2. throw exceptions when fen string is invalid
+ * TODO: add ai and clocks
  */
 
 #pragma once
 
 #include <string>
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
-#include "board.hpp"
+#include "human_player.hpp"
 #include "logger.hpp"
-
-using chess::piece_t;
-using std::string, std::vector, std::unordered_set;
+#include "move_generator.hpp"
 
 namespace chess {
 
-struct KeyHasher {
-  std::size_t operator()(const Move& k) const {
-    // [0, 31]
-    return ((k.from_ << 6) | k.to_); // unique
-  }
-};
-
 class Game {
+
 public:
+  enum class Result {
+    Playing,
+    WhiteIsMated,
+    BlackIsMated,
+    Stalemate,
+    Repetition,
+    FiftyMoveRule,
+    InsufficientMaterial
+  };
+  enum class PlayerType { Human, AI };
+
+  bool use_clocks_{};
+  bool load_custom_position_{};
+  std::string custom_position_ =
+      "1rbq1r1k/2pp2pp/p1n3p1/2b1p3/R3P3/1BP2N2/1P3PPP/1NBQ1RK1 w - - 0 1";
+
+  PlayerType white_player_type_;
+  PlayerType black_player_type_;
+
+  Result game_result_;
+
+  Player *white_player_;
+  Player *black_player_;
+  Player *player_to_move_;
+
+  std::vector<Move> game_moves_;
+
+  Board *board_;
+  Board *search_board_;
+
   Game();
-  virtual ~Game();
+  ~Game();
 
-  
-  void set_piece_selected(square_t start_square, piece_t piece);
-  void set_board_fen(string fen);
+  void CreatePlayer(PlayerType white_player_type, PlayerType black_player_type);
 
-  virtual void generate_pawn_moves(square_t start_square, piece_t piece);
-  virtual void generate_knight_moves(square_t start_square, piece_t piece);
-  virtual void generate_king_moves(square_t start_square, piece_t piece);
-  virtual void generate_sliding_moves(square_t start_square, piece_t piece);
-  virtual void generate_moves_for_piece(square_t start_square, piece_t piece);
-  virtual void generate_moves();
-  virtual void generate_legal_moves();
-  
-  virtual void make_move(const Move& move, piece_t promotion_piece = EMPTY);
-  virtual void make_move(const string &move, piece_t promotion_piece = EMPTY);
-  virtual void make_move(square_t from, square_t to, piece_t promotion_piece = EMPTY);
+  void NewGame(PlayerType white_player_type, PlayerType black_player_type);
+  void ExportGame();
+  void NotifyPlayerToMove();
+  auto GetGameState() -> Result;
+  void PrintGameResult();
+  void Init();
+  void Update();
+  void UndoMoveRecentMove();
 
-  virtual void undo_move(); // TODO: implement undo move when the promotion piece is invalid
-
-  virtual bool is_legal_move(const Move &move);
-
-  array<square_t, NUM_SQUARES> get_attacking_counts();
-
-  array<square_t, NUM_SQUARES> get_xray_counts();
-
-  Board<piece_t>& get_board() { return board_; }
-
-
-  Game &operator=(Game &&other) {
-    swap(board_, other.board_);
-    return *this;
-  }
-
-  vector<Move>& get_moves() { return moves_; }
-
-protected:
-  Board<piece_t> board_;
-  vector<Move> moves_; // moves for the current color;
-  unordered_set<Move, KeyHasher> moves_set_; // copy of _moves, but hashing
+  void OnMoveChosen(const Move &move);
 };
 
 } // namespace chess

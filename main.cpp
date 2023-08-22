@@ -4,40 +4,38 @@
 #include "web.hpp"
 #include "window.hpp"
 
-using namespace chess;
-
-void usage(const char *target_name) { std::cout << "Usage: \n"; }
+void Usage(const char *target_name) { std::cout << "Usage: \n"; }
 
 struct WebOpts {
-  bool local = false;
-  int port = 8080;
+  bool local_ = false;
+  int port_ = 8080;
 };
 
-int main(int argc, const char *argv[]) {
+auto main(int argc, const char *argv[]) -> int {
   if (argc <= 2) {
     if (argc == 1) {
-      usage(argv[0]);
+      Usage(argv[0]);
       return 0;
     }
     if (strcmp(argv[1], "--help") == 0) {
-      usage(argv[0]);
+      Usage(argv[0]);
       return 0;
     }
   }
 
   auto parser = CmdOpts<WebOpts>::Create(
-      {{"--port", &WebOpts::port}, {"--local", &WebOpts::local}});
+      {{"--port", &WebOpts::port_}, {"--local", &WebOpts::local_}});
 
   auto myopts = parser->parse(argc, argv);
 
-  // precomputeMoveData();
-
-  if (myopts.local) {
-    gui::window_run(argc, const_cast<char **>(argv));
+  if (myopts.local_) {
+    gui::WindowRun(argc, const_cast<char **>(argv));
     return 0;
   }
 
-  Web web(myopts.port);
-  web.run();
+
+  // // TODO(justin): change this later
+  // chess::Web web(myopts.port_);
+  // web.Run();
   return 0;
 }
